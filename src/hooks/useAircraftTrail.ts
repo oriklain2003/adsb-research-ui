@@ -78,6 +78,10 @@ export function useAircraftTrail(
       gs: ac.gs,
       track: ac.track,
       on_ground: ac.on_ground,
+      nic: null,
+      nac_p: null,
+      nac_v: null,
+      rssi: null,
     };
 
     setTrail((prev) => {

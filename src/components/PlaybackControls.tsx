@@ -20,7 +20,7 @@ function formatTimestamp(ts: string): string {
 
 export default function PlaybackControls({
   playback,
-  trail,
+  trail: _trail,
   onClose,
 }: PlaybackControlsProps) {
   const { playing, currentPoint, progress, speed, togglePlay, seek, setSpeed } =

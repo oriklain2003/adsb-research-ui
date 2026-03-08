@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Map, NavigationControl, useMap } from "react-map-gl/maplibre";
 import DeckGLOverlay from "./DeckGLOverlay";
 import MapControls from "./MapControls";
