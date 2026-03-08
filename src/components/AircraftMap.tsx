@@ -41,6 +41,8 @@ function MapContent() {
   const [batchAnomalyPanelOpen, setBatchAnomalyPanelOpen] = useState(false);
   const [playbackTrail, setPlaybackTrail] = useState<TrailPoint[]>([]);
   const [playbackActive, setPlaybackActive] = useState(false);
+  const [playbackTypeDesc, setPlaybackTypeDesc] = useState<string | null>(null);
+  const [playbackDbFlags, setPlaybackDbFlags] = useState<number | null>(null);
 
   // Nearby flight state
   const [nearbyTrail, setNearbyTrail] = useState<TrailPoint[]>([]);
@@ -116,12 +118,20 @@ function MapContent() {
       // Clear live selection
       setSelectedHex(null);
 
-      fetch(
+      // Fetch trail and aircraft detail in parallel
+      const trailP = fetch(
         `${API_URL}/api/aircraft/${hex}/trail?start_ts=${encodeURIComponent(startTs)}&end_ts=${encodeURIComponent(endTs)}`,
-      )
+      ).then((res) => res.json()) as Promise<TrailPoint[]>;
+
+      const detailP = fetch(`${API_URL}/api/aircraft/${hex}`)
         .then((res) => res.json())
-        .then((data: TrailPoint[]) => {
+        .catch(() => null) as Promise<{ type_description?: string | null; icao_type?: string | null; db_flags?: number | null; registration?: string | null } | null>;
+
+      Promise.all([trailP, detailP])
+        .then(([data, detail]) => {
           setPlaybackTrail(data);
+          setPlaybackTypeDesc(detail?.type_description ?? detail?.icao_type ?? null);
+          setPlaybackDbFlags(detail?.db_flags ?? null);
           setPlaybackActive(true);
           setSearchOpen(false);
           fitTrailBounds(data);
@@ -134,6 +144,8 @@ function MapContent() {
   const closePlayback = useCallback(() => {
     setPlaybackActive(false);
     setPlaybackTrail([]);
+    setPlaybackTypeDesc(null);
+    setPlaybackDbFlags(null);
     setNearbyTrail([]);
     setNearbyInfo(null);
   }, []);
@@ -198,33 +210,16 @@ function MapContent() {
     [handleSelectFlight, batchAnomaly],
   );
 
-  // Handle batch anomaly full flight
+  // Handle batch anomaly full flight — fetch trail with 2h padding around the
+  // event instead of relying on flight-segment lookup (which can miss pre-spoof
+  // positions when the spoof causes a segment split).
   const handleBatchAnomalyFullFlight = useCallback(
     (hex: string, startTs: string) => {
       batchAnomaly.setSelectedEvent(null);
-      // Fetch flights for this hex and find the segment overlapping startTs
-      fetch(`${API_URL}/api/aircraft/${hex}/flights`)
-        .then((res) => res.json())
-        .then((flights: Array<{ start_ts: string; end_ts: string }>) => {
-          const eventTime = new Date(startTs).getTime();
-          const match = flights.find((f) => {
-            const s = new Date(f.start_ts).getTime();
-            const e = new Date(f.end_ts).getTime();
-            return eventTime >= s && eventTime <= e;
-          });
-          if (match) {
-            handleSelectFlight(hex, match.start_ts, match.end_ts);
-          } else if (flights.length > 0) {
-            // Fallback: find closest flight
-            flights.sort(
-              (a, b) =>
-                Math.abs(new Date(a.start_ts).getTime() - eventTime) -
-                Math.abs(new Date(b.start_ts).getTime() - eventTime),
-            );
-            handleSelectFlight(hex, flights[0].start_ts, flights[0].end_ts);
-          }
-        })
-        .catch((err) => console.error("Failed to fetch flights for full flight:", err));
+      const padMs = 2 * 60 * 60 * 1000; // 2 hours
+      const start = new Date(new Date(startTs).getTime() - padMs).toISOString();
+      const end = new Date(new Date(startTs).getTime() + padMs).toISOString();
+      handleSelectFlight(hex, start, end);
     },
     [handleSelectFlight, batchAnomaly],
   );
@@ -292,7 +287,7 @@ function MapContent() {
           onClick={() => setAnomalyPanelOpen((v) => !v)}
           className="bg-gray-800/80 backdrop-blur-sm text-gray-300 hover:text-white text-xs px-2.5 py-1.5 rounded border border-gray-700/50 transition-colors text-left"
         >
-          Anomalies
+          Detection v1
         </button>
         {anomalyPanelOpen && (
           <AnomalyTogglePanel
@@ -311,7 +306,7 @@ function MapContent() {
           onClick={() => setBatchAnomalyPanelOpen((v) => !v)}
           className="bg-gray-800/80 backdrop-blur-sm text-gray-300 hover:text-white text-xs px-2.5 py-1.5 rounded border border-gray-700/50 transition-colors text-left"
         >
-          Batch Anomalies
+          Detection v2
         </button>
         {batchAnomalyPanelOpen && (
           <BatchAnomalyTogglePanel
@@ -349,7 +344,11 @@ function MapContent() {
       {playbackActive && playbackTrail.length > 0 && (
         <>
           <div className="absolute top-3 right-14 z-20 flex flex-col gap-2">
-            <PlaybackInfoCard point={playback.currentPoint} />
+            <PlaybackInfoCard
+              point={playback.currentPoint}
+              typeDescription={playbackTypeDesc}
+              dbFlagsOverride={playbackDbFlags}
+            />
             {nearbyTrail.length > 0 && nearbyCurrentPoint && (
               <PlaybackInfoCard
                 point={nearbyCurrentPoint}

@@ -63,7 +63,7 @@ export default function AnomalyTogglePanel({
     <div className="bg-gray-800/90 backdrop-blur-sm rounded border border-gray-700/50 p-2.5 min-w-[200px]">
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-bold text-gray-200 uppercase tracking-wider">
-          Anomalies
+          Detection v1
         </span>
         <button
           onClick={onClose}

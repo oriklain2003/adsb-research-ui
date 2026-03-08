@@ -4,6 +4,7 @@ interface PlaybackInfoCardProps {
   point: TrailPoint | null;
   accentColor?: string;
   typeDescription?: string | null;
+  dbFlagsOverride?: number | null;
   onRemove?: () => void;
 }
 
@@ -29,6 +30,16 @@ function getTypeColor(dbFlags: number | null | undefined): string {
   return "text-gray-200";
 }
 
+function formatDbFlags(dbFlags: number | null | undefined): string {
+  if (dbFlags == null || dbFlags === 0) return "\u2014";
+  const tags: string[] = [];
+  if (dbFlags & 1) tags.push("Military");
+  if (dbFlags & 2) tags.push("Interesting");
+  if (dbFlags & 4) tags.push("PIA");
+  if (dbFlags & 8) tags.push("LADD");
+  return tags.length > 0 ? tags.join(", ") : "\u2014";
+}
+
 const FIELDS: {
   label: string;
   get: (p: TrailPoint) => string;
@@ -52,6 +63,7 @@ export default function PlaybackInfoCard({
   point,
   accentColor,
   typeDescription,
+  dbFlagsOverride,
   onRemove,
 }: PlaybackInfoCardProps) {
   if (!point) return null;
@@ -79,14 +91,18 @@ export default function PlaybackInfoCard({
             <span className="text-gray-200 tabular-nums">{f.get(point)}</span>
           </div>
         ))}
-        {typeDescription && (
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-400">Type</span>
-            <span className={`${getTypeColor(point.db_flags)} tabular-nums`}>
-              {typeDescription}
-            </span>
-          </div>
-        )}
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-400">Type</span>
+          <span className={`${getTypeColor(dbFlagsOverride ?? point.db_flags)} tabular-nums`}>
+            {typeDescription ?? "\u2014"}
+          </span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-400">Flags</span>
+          <span className={`${getTypeColor(dbFlagsOverride ?? point.db_flags)} tabular-nums`}>
+            {formatDbFlags(dbFlagsOverride ?? point.db_flags)}
+          </span>
+        </div>
       </div>
     </div>
   );

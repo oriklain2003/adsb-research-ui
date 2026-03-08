@@ -54,7 +54,7 @@ export default function BatchAnomalyTogglePanel({
     <div className="bg-gray-800/90 backdrop-blur-sm rounded border border-gray-700/50 p-2.5 min-w-[220px]">
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-bold text-gray-200 uppercase tracking-wider">
-          Batch Anomalies
+          Detection v2
         </span>
         <button
           onClick={onClose}
