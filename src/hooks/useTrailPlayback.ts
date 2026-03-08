@@ -95,8 +95,6 @@ export function useTrailPlayback(
   );
 
   const effectiveStart = overrideTimeRange?.startTime ?? timestamps[0] ?? 0;
-  const effectiveEnd = overrideTimeRange?.endTime ?? (timestamps[timestamps.length - 1] ?? 0);
-
   // When override is active, use tracked playbackTime (allows seeking outside trail range).
   // Otherwise derive from the trail index as before.
   const currentTime = overrideTimeRange

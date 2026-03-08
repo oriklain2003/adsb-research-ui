@@ -44,7 +44,6 @@ function MapContent() {
 
   // Nearby flight state
   const [nearbyTrail, setNearbyTrail] = useState<TrailPoint[]>([]);
-  const [nearbyHex, setNearbyHex] = useState<string | null>(null);
   const [nearbyInfo, setNearbyInfo] = useState<NearbyFlightResult | null>(null);
   const [nearbySearchOpen, setNearbySearchOpen] = useState(false);
 
@@ -136,7 +135,6 @@ function MapContent() {
     setPlaybackActive(false);
     setPlaybackTrail([]);
     setNearbyTrail([]);
-    setNearbyHex(null);
     setNearbyInfo(null);
   }, []);
 
@@ -152,7 +150,6 @@ function MapContent() {
     (result: NearbyFlightResult) => {
       setNearbySearchOpen(false);
       setNearbyInfo(result);
-      setNearbyHex(result.hex);
       // Fetch trail for the selected nearby flight
       fetch(
         `${API_URL}/api/aircraft/${result.hex}/trail?start_ts=${encodeURIComponent(result.start_ts)}&end_ts=${encodeURIComponent(result.end_ts)}`,
@@ -171,7 +168,6 @@ function MapContent() {
   // Handle nearby flight removal
   const handleRemoveNearby = useCallback(() => {
     setNearbyTrail([]);
-    setNearbyHex(null);
     setNearbyInfo(null);
   }, []);
 

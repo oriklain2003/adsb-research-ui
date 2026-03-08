@@ -82,6 +82,8 @@ export function useAircraftTrail(
       nac_p: null,
       nac_v: null,
       rssi: null,
+      flight: null,
+      db_flags: null,
     };
 
     setTrail((prev) => {
