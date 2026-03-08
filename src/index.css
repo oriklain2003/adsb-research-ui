@@ -1,0 +1,10 @@
+@import "tailwindcss";
+@import "maplibre-gl/dist/maplibre-gl.css";
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-gray-950 text-gray-100 m-0 p-0;
+}
