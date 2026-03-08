@@ -9,6 +9,7 @@ import AircraftDetailPanel from "./AircraftDetailPanel";
 import HexSearchPanel from "./HexSearchPanel";
 import PlaybackControls from "./PlaybackControls";
 import PlaybackInfoCard from "./PlaybackInfoCard";
+import NearbySearchModal from "./NearbySearchModal";
 import AnomalyTogglePanel from "./AnomalyTogglePanel";
 import AnomalyDetailPanel from "./AnomalyDetailPanel";
 import JammingHourSlider from "./JammingHourSlider";
@@ -24,7 +25,7 @@ import { useBatchAnomalyLayers } from "../hooks/useBatchAnomalyLayers";
 import { createAircraftLayer } from "./AircraftLayer";
 import { createTrailLayer, createPlaybackAircraftLayer } from "./TrailLayer";
 import { DEFAULT_VIEW, DARK_MATTER_STYLE, API_URL } from "../lib/constants";
-import type { TrailPoint } from "../types/aircraft";
+import type { TrailPoint, NearbyFlightResult } from "../types/aircraft";
 
 function MapContent() {
   const { aircraft, activeCount, wsState, colorTick, lastSnapshotAt, animTick, liveEnabled, setLiveEnabled } =
@@ -40,7 +41,42 @@ function MapContent() {
   const [batchAnomalyPanelOpen, setBatchAnomalyPanelOpen] = useState(false);
   const [playbackTrail, setPlaybackTrail] = useState<TrailPoint[]>([]);
   const [playbackActive, setPlaybackActive] = useState(false);
-  const playback = useTrailPlayback(playbackTrail);
+
+  // Nearby flight state
+  const [nearbyTrail, setNearbyTrail] = useState<TrailPoint[]>([]);
+  const [nearbyHex, setNearbyHex] = useState<string | null>(null);
+  const [nearbyInfo, setNearbyInfo] = useState<NearbyFlightResult | null>(null);
+  const [nearbySearchOpen, setNearbySearchOpen] = useState(false);
+
+  // Override time range for dual-trail sync
+  const overrideTimeRange = useMemo(() => {
+    if (nearbyTrail.length === 0 || playbackTrail.length === 0) return undefined;
+    const mainTimes = playbackTrail.map((p) => new Date(p.ts).getTime());
+    const nearbyTimes = nearbyTrail.map((p) => new Date(p.ts).getTime());
+    return {
+      startTime: Math.min(mainTimes[0], nearbyTimes[0]),
+      endTime: Math.max(mainTimes[mainTimes.length - 1], nearbyTimes[nearbyTimes.length - 1]),
+    };
+  }, [playbackTrail, nearbyTrail]);
+
+  const playback = useTrailPlayback(playbackTrail, overrideTimeRange);
+
+  // Compute the nearby flight's current point from playback.currentTime
+  const nearbyCurrentPoint = useMemo(() => {
+    if (!nearbyTrail.length || !playback.currentTime) return null;
+    const timestamps = nearbyTrail.map((p) => new Date(p.ts).getTime());
+    // Before first point: show at starting position
+    if (playback.currentTime <= timestamps[0]) return nearbyTrail[0];
+    // After last point: show at ending position
+    if (playback.currentTime >= timestamps[timestamps.length - 1]) return nearbyTrail[nearbyTrail.length - 1];
+    // Find closest point <= currentTime
+    let idx = 0;
+    for (let i = 0; i < timestamps.length - 1; i++) {
+      if (timestamps[i + 1] > playback.currentTime) break;
+      idx = i + 1;
+    }
+    return nearbyTrail[idx];
+  }, [nearbyTrail, playback.currentTime]);
 
   // Anomaly layers
   const anomaly = useAnomalyLayers();
@@ -99,6 +135,44 @@ function MapContent() {
   const closePlayback = useCallback(() => {
     setPlaybackActive(false);
     setPlaybackTrail([]);
+    setNearbyTrail([]);
+    setNearbyHex(null);
+    setNearbyInfo(null);
+  }, []);
+
+  // Handle "Find Nearby" button click
+  const handleFindNearby = useCallback(() => {
+    if (!playback.currentPoint) return;
+    playback.pause();
+    setNearbySearchOpen(true);
+  }, [playback]);
+
+  // Handle nearby flight selection from modal
+  const handleSelectNearby = useCallback(
+    (result: NearbyFlightResult) => {
+      setNearbySearchOpen(false);
+      setNearbyInfo(result);
+      setNearbyHex(result.hex);
+      // Fetch trail for the selected nearby flight
+      fetch(
+        `${API_URL}/api/aircraft/${result.hex}/trail?start_ts=${encodeURIComponent(result.start_ts)}&end_ts=${encodeURIComponent(result.end_ts)}`,
+      )
+        .then((res) => res.json())
+        .then((data: TrailPoint[]) => {
+          setNearbyTrail(data);
+          // Fit bounds to include both trails
+          fitTrailBounds([...playbackTrail, ...data]);
+        })
+        .catch((err) => console.error("Failed to fetch nearby trail:", err));
+    },
+    [fitTrailBounds, playbackTrail],
+  );
+
+  // Handle nearby flight removal
+  const handleRemoveNearby = useCallback(() => {
+    setNearbyTrail([]);
+    setNearbyHex(null);
+    setNearbyInfo(null);
   }, []);
 
   // Handle anomaly event replay
@@ -175,6 +249,19 @@ function MapContent() {
       );
     }
 
+    // Nearby trail + animated aircraft
+    if (playbackActive && nearbyTrail.length > 0) {
+      result.push(createTrailLayer(nearbyTrail, "nearby-trail") as never);
+      result.push(
+        createPlaybackAircraftLayer(
+          nearbyCurrentPoint,
+          playback.currentIndex,
+          "playback-nearby-aircraft",
+          [255, 191, 0, 255], // Amber color for nearby aircraft
+        ) as never,
+      );
+    }
+
     // Anomaly layers
     for (const layer of anomaly.layers) {
       result.push(layer as never);
@@ -189,6 +276,7 @@ function MapContent() {
   }, [
     aircraft, colorTick, animTick, selectedHex, trail,
     playbackActive, playbackTrail, playback.currentPoint, playback.currentIndex,
+    nearbyTrail, nearbyCurrentPoint,
     anomaly.layers, batchAnomaly.layers,
   ]);
 
@@ -264,13 +352,35 @@ function MapContent() {
 
       {playbackActive && playbackTrail.length > 0 && (
         <>
-          <PlaybackInfoCard point={playback.currentPoint} />
+          <div className="absolute top-3 right-14 z-20 flex flex-col gap-2">
+            <PlaybackInfoCard point={playback.currentPoint} />
+            {nearbyTrail.length > 0 && nearbyCurrentPoint && (
+              <PlaybackInfoCard
+                point={nearbyCurrentPoint}
+                accentColor="border-amber-500/50"
+                typeDescription={nearbyInfo?.type_description}
+                onRemove={handleRemoveNearby}
+              />
+            )}
+          </div>
           <PlaybackControls
             playback={playback}
             trail={playbackTrail}
             onClose={closePlayback}
+            onFindNearby={handleFindNearby}
           />
         </>
+      )}
+
+      {nearbySearchOpen && playback.currentPoint && (
+        <NearbySearchModal
+          lat={playback.currentPoint.lat!}
+          lon={playback.currentPoint.lon!}
+          time={playback.currentPoint.ts}
+          excludeHex={playbackTrail[0]?.hex ?? ""}
+          onSelect={handleSelectNearby}
+          onClose={() => setNearbySearchOpen(false)}
+        />
       )}
 
       {anomaly.selectedEvent && (

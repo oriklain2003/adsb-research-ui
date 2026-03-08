@@ -87,6 +87,7 @@ export interface FlightSummary {
 export interface TrailPoint {
   hex: string;
   ts: string;
+  flight: string | null;
   lat: number | null;
   lon: number | null;
   alt_baro: number | null;
@@ -98,4 +99,18 @@ export interface TrailPoint {
   nac_p: number | null;
   nac_v: number | null;
   rssi: number | null;
+  db_flags: number | null;
+}
+
+/** Result from GET /api/aircraft/nearby. */
+export interface NearbyFlightResult {
+  hex: string;
+  flight: string | null;
+  icao_type: string | null;
+  type_description: string | null;
+  db_flags: number | null;
+  distance_nm: number;
+  closest_ts: string;
+  start_ts: string;
+  end_ts: string;
 }

@@ -5,6 +5,7 @@ interface PlaybackControlsProps {
   playback: PlaybackState;
   trail: TrailPoint[];
   onClose: () => void;
+  onFindNearby?: () => void;
 }
 
 const SPEEDS = [1, 2, 5, 10];
@@ -22,6 +23,7 @@ export default function PlaybackControls({
   playback,
   trail: _trail,
   onClose,
+  onFindNearby,
 }: PlaybackControlsProps) {
   const { playing, currentPoint, progress, speed, togglePlay, seek, setSpeed } =
     playback;
@@ -82,6 +84,16 @@ export default function PlaybackControls({
           </button>
         ))}
       </div>
+
+      {/* Find Nearby button */}
+      {onFindNearby && (
+        <button
+          onClick={onFindNearby}
+          className="text-xs text-gray-400 hover:text-gray-200 px-2 py-0.5 border border-gray-600/50 rounded transition-colors shrink-0"
+        >
+          Nearby
+        </button>
+      )}
 
       {/* Close button */}
       <button

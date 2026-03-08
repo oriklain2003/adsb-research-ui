@@ -46,17 +46,19 @@ export function createTrailLayer(points: TrailPoint[], id = "flight-trail") {
 export function createPlaybackAircraftLayer(
   point: TrailPoint | null,
   tick: number,
+  id = "playback-aircraft",
+  overrideColor?: [number, number, number, number],
 ) {
   if (!point || point.lat == null || point.lon == null) {
     return new IconLayer({
-      id: "playback-aircraft",
+      id,
       data: [],
       getPosition: () => [0, 0],
       getIcon: () => "marker",
     });
   }
   return new IconLayer<TrailPoint>({
-    id: "playback-aircraft",
+    id,
     data: [point],
     getPosition: (d) => [d.lon!, d.lat!],
     getAngle: (d) => -(d.track ?? 0),
@@ -67,7 +69,7 @@ export function createPlaybackAircraftLayer(
     },
     getSize: 28,
     sizeUnits: "pixels" as const,
-    getColor: altitudeToColor(point.alt_baro, point.on_ground),
+    getColor: overrideColor ?? altitudeToColor(point.alt_baro, point.on_ground),
     updateTriggers: {
       getPosition: [tick],
       getAngle: [tick],
